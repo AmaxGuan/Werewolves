@@ -139,6 +139,7 @@ class Room
       :cur_move => @cur_move,
       :cards => @cards,
       :votes => @votes
+      :users => @users.map(&:to_h)
     }
   end
 end
@@ -164,23 +165,39 @@ class User
   end
 
   def kill(uid)
+    raise :wrong_action
   end
 
   def poison(uid)
+    raise :wrong_action
   end
 
   def rescue(uid)
+    raise :wrong_action
   end
 
   def check(uid)
+    raise :wrong_action
   end
 
   def connect(uid1, uid2)
+    raise :wrong_action
   end
 
   def shoot(uid)
+    raise :wrong_action
   end
 
+  def to_h
+    {
+      :id => @id,
+      :card => @card,
+      :room => @room,
+      :is_dead => @is_dead,
+      :is_candidate => @is_candidate,
+      :is_police => @is_police
+    }
+  end
 protected
   def initialize(id, card, room_id)
     @id = id
