@@ -129,7 +129,7 @@ class Room
   # routine check, invoked in every heart beat function
   def heart_beat_check
     if AUTO_COMPLETE_SCENES.include? cur_move then
-      go_next_move if Time.new - @cur_move_start_time >= 5 then # seconds
+      go_next_move if Time.new - @cur_move_start_time >= 5 # seconds
     end
   end
 
@@ -338,10 +338,6 @@ end
 get '/:room_id/cur_move' do
   room = Room.get_room(params[:room_id])
   cur_move = room.cur_move.to_s
-
-  case cur_move
-  when :all_close
-
   cur_move
 end
 
