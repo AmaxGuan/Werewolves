@@ -65,7 +65,7 @@
     <script type="text/javascript">
     angular
       .module('starterApp',['ngMaterial', 'mgo-angular-wizard'])
-      .controller('WolfCtrl', ['$scope', '$timeout', 'WizardHandler', '$mdDialog', function($scope, $timeout, WizardHandler, $mdDialog) {
+      .controller('WolfCtrl', ['$scope', '$http', '$timeout', 'WizardHandler', '$mdDialog', function($scope, $http, $timeout, WizardHandler, $mdDialog) {
         var voice = window.speechSynthesis;
         $scope.speak = function(text) {
           if (!$scope.s.voiceEnabled) return;
@@ -123,7 +123,23 @@
         };
 
         $scope.createGame = function() {
-          $scope.s.villager.players = $scope.playerNums();
+          $http({
+            method: 'GET',
+            url: '/create_room',
+            params: {
+              num_players: $scope.totalPlayers(),
+              num_werewolves: $scope.s.werewolf.count,
+              seer: $scope.s.seer.exists,
+              witch: $scope.s.witch.exists,
+              idiot: $scope.s.idiot.exists,
+              hunter: $scope.s.hunter.exists
+            }
+          }).then(
+            function onSuccess (response) {
+              console.log(response.data);
+            }, function onFailure () {
+
+            });
         };
         $scope.totalPlayers = function() {
           var num = 0;

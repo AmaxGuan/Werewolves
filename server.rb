@@ -311,8 +311,13 @@ end
 
 #### APIS #####
 
+def get_or_post(path, opts={}, &block)
+  get(path, opts, &block)
+  post(path, opts, &block)
+end
+
 #TODO: change to post, get for easy testing
-get '/create_room' do
+get_or_post '/create_room' do
   num_players = Integer(params[:num_players])
   num_werewolves = Integer(params[:num_werewolves])
   gods = []
@@ -320,7 +325,7 @@ get '/create_room' do
     gods.push(char) if params[char] == "true"
   end
   room = Room.new(num_players, num_werewolves, gods)
-  "Room created, You Room Number is: #{room.id}"
+  Yajl::Encoder.encode({:room_id => room.id })
 end
 
 get '/:room_id/room_info' do
