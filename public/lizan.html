@@ -1,0 +1,401 @@
+
+<!DOCTYPE html>
+<html lang="en" >
+  <head>
+    <title>狼人杀上帝</title>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="description" content="">
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no" />
+
+    <link rel='stylesheet' href='https://fonts.googleapis.com/css?family=Roboto:400,500,700,400italic'>
+    <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/angular_material/1.0.4/angular-material.min.css">
+<!-- <link rel="stylesheet" type="text/css" href="http://cdn.jsdelivr.net/angular.wizard/0.6.1/angular-wizard.min.css"> -->
+    <!-- <link rel="stylesheet" href="assets/app.css"/> -->
+
+    <style type="text/css">
+        /**
+         * Hide when Angular is not yet loaded and initialized
+         */
+        [ng\:cloak], [ng-cloak], [data-ng-cloak], [x-ng-cloak], .ng-cloak, .x-ng-cloak {
+          display: none !important;
+        }
+
+        #content  {
+          padding-left: 40px;
+          padding-right: 40px;
+          padding-top: 5px;
+        }
+    </style>
+
+  </head>
+
+  <body ng-app="starterApp" ng-controller="WolfCtrl" layout="row" ng-cloak >
+
+    <div flex layout="column" tabIndex="-1" role="main" class="md-whiteframe-z2">
+      <wizard hide-indicators="true" current-step="currentStep">
+      <wz-step wz-title="Configure">
+          <md-content flex id="content">
+            <h3>游戏设置</h3>
+            <md-list ng-cloak>
+              <md-list-item>
+                <p>上帝声音</p>
+                <md-checkbox class="md-secondary" ng-model="s.voiceEnabled"></md-checkbox>
+              </md-list-item>
+              <md-list-item ng-repeat="player in players">
+                <p> {{ player.name }} </p>
+                <!-- <div layout class="md-secondary"> -->
+                <input flex="20" type="number" ng-model="s[player.symbol].count" aria-label="{{player.symbol}}-number" aria-controls="{{player.symbol}}-slider">
+                <md-slider flex="20" min="1" max="5" ng-model="s[player.symbol].count" aria-label="{{player.symbol}}-number" id="{{player.symbol}}-slider" md-discrete></md-slider>
+                <!-- </div> -->
+              </md-list-item>
+              <md-list-item ng-repeat="position in positions">
+                <p> {{ position.name }} </p>
+                <md-checkbox class="md-secondary" ng-model="s[position.symbol].exists"></md-checkbox>
+              </md-list-item>
+            </md-list>
+            <div layout="row">
+              <md-button flex="100" layout-align="end center" class="md-raised md-primary" wz-next="configured()">Next</md-button>
+            </div>
+          </md-content>
+      </wz-step>
+
+      <wz-step wz-title="Hunter" wz-disabled="{{!s.hunter.exists}}">
+        <md-content flex id="content">
+          <h3>猎人选择自己号码</h3>
+          <div layout="row" layout-wrap flex>
+            <md-button flex="45" class="md-raised md-primary" ng-repeat="i in playerNums()" wz-next="setPosition('hunter', {{i}})">{{i}}</md-button>
+          </div>
+        </md-content>
+      </wz-step>
+
+      <wz-step wz-title="Idiot" wz-disabled="{{!s.idiot.exists}}">
+        <md-content flex id="content">
+          <h3>白痴选择自己号码</h3>
+          <div layout="row" layout-wrap flex>
+            <md-button flex="45" class="md-raised md-primary" ng-repeat="i in playerNums()" wz-next="setPosition('idiot', {{i}})">{{i}}</md-button>
+          </div>
+        </md-content>
+      </wz-step>
+
+      <wz-step wz-title="Wolves">
+        <md-content flex id="content">
+          <h3>狼人选择自己号码</h3>
+          <div layout="row" layout-wrap flex>
+            <div flex="50" ng-repeat="i in playerNums()">
+              <md-checkbox ng-checked="exists(i, 'werewolf')" ng-click="toggle(i, 'werewolf')">
+                {{ i }}
+              </md-checkbox>
+            </div>
+          </div>
+          <div layout="row" layout-wrap flex>
+            <md-button flex="100" layout-align="end center" class="md-raised md-primary" wz-next ng-disabled="s.werewolf.players.length != s.werewolf.count">Next</md-button>
+          </div>
+        </md-content>
+      </wz-step>
+
+      <wz-step wz-title="WolvesKill">
+        <md-content flex id="content">
+          <h3>狼人击杀目标</h3>
+          <div layout="row" layout-wrap flex>
+            <md-button flex="100" class="md-raised" wz-next>SKIP</md-button>
+            <md-button flex="45" class="md-raised" ng-repeat="i in playerNums()" wz-next="kill({{i}})">{{i}}</md-button>
+          </div>
+        </md-content>
+      </wz-step>
+
+      <wz-step wz-title="Witch" wz-disabled="{{!s.witch.exists}}">
+        <md-content flex id="content">
+          <h3>女巫选择自己号码</h3>
+          <div layout="row" layout-wrap flex>
+            <md-button flex="45" class="md-raised md-primary" ng-repeat="i in playerNums()" wz-next="setPosition('witch', {{i}})">{{i}}</md-button>
+          </div>
+        </md-content>
+      </wz-step>
+
+      <wz-step wz-title="WitchSave" wz-disabled="{{!s.witch.exists}}">
+        <md-content flex id="content">
+          <h3>女巫救人</h3>
+          <span>击杀目标： {{s.killing.player}}</span>
+          <div layout="row" layout-wrap flex>
+            <md-button flex="45" class="md-raised md-primary" wz-next="witchSave()">YES</md-button>
+            <md-button flex="45" class="md-raised md-primary" wz-next>NO</md-button>
+          </div>
+        </md-content>
+      </wz-step>
+
+      <wz-step wz-title="WitchPoison" wz-disabled="{{!s.witch.exists}}">
+        <md-content flex id="content">
+          <h3>女巫毒人</h3>
+          <div layout="row" layout-wrap flex>
+            <md-button flex="100" class="md-raised" wz-next>NO</md-button>
+            <md-button flex="45" class="md-raised" ng-repeat="i in playerNums()" wz-next="poison({{i}})">{{i}}</md-button>
+          </div>
+        </md-content>
+      </wz-step>
+
+      <wz-step wz-title="Seer" wz-disabled="{{!s.seer.exists}}">
+        <md-content flex id="content">
+          <h3>预言家选择自己号码</h3>
+          <div layout="row" layout-wrap flex>
+            <md-button flex="45" class="md-raised md-primary" ng-repeat="i in playerNums()" wz-next="setPosition('seer', {{i}})">{{i}}</md-button>
+          </div>
+        </md-content>
+      </wz-step>
+
+      <wz-step wz-title="SeerTest" wz-disabled="{{!s.seer.exists}}">
+        <md-content flex id="content">
+          <h3>预言家验人</h3>
+          <div layout="row" layout-wrap flex>
+            <md-button flex="100" class="md-raised" wz-next>SKIP</md-button>
+            <md-button flex="45" class="md-raised" ng-repeat="i in playerNums()" ng-click="seerTest(i)">{{i}}</md-button>
+          </div>
+        </md-content>
+      </wz-step>
+
+      <wz-step wz-title="Police">
+        <md-content flex id="content">
+          <h3>警长竞选</h3>
+          <div layout="row" layout-wrap flex>
+            <md-button flex="100" class="md-raised md-primary" wz-next="wakeup()">NEXT</md-button>
+          </div>
+        </md-content>
+      </wz-step>
+
+      <wz-step wz-title="Result">
+        <md-content flex id="content">
+          <h3>昨夜</h3>
+          <p ng-if="s.dead.players.length == 0">平安夜</p>
+          <p ng-if="s.dead.players.length != 0"><span ng-repeat="i in s.dead.players">{{i}}号</span>玩家死亡</p>
+          <p ng-if="!s.hunter.canShoot">猎人没有技能</p>
+          <div layout="row" layout-wrap flex>
+            <md-button flex="100" class="md-raised md-primary" wz-next>上帝模式</md-button>
+          </div>
+        </md-content>
+      </wz-step>
+
+      <wz-step wz-title="God">
+        <md-content flex id="content">
+          <h3>上帝模式</h3>
+          <md-list ng-cloak>
+            <md-list-item ng-repeat="player in players">
+              <p> {{ player.name }} </p>
+              <span class="md-secondary">
+                <span ng-repeat="i in s[player.symbol].players">&nbsp;{{i}}</span>
+              </span>
+            </md-list-item>
+            <md-list-item ng-repeat="position in positions" ng-if="s[position.symbol].exists">
+              <p> {{ position.name }} </p>
+              <span class="md-secondary">{{ s[position.symbol].player }}</span>
+            </md-list-item>
+          </md-list>
+          <div>
+            <p ng-repeat="text in logText"
+                class="repeated-item">
+              {{text}}
+            </p>
+          </div>
+        </md-content>
+      </wz-step>
+    </wizard>
+  </div>
+
+
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.9/angular.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.9/angular-animate.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.9/angular-aria.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/angular_material/1.0.4/angular-material.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/angular.wizard/0.6.1/angular-wizard.min.js"></script>
+
+    <script type="text/javascript">
+
+    angular
+      .module('starterApp',['ngMaterial', 'mgo-angular-wizard'])
+      .controller('WolfCtrl', ['$scope', '$timeout', 'WizardHandler', '$mdDialog', function($scope, $timeout, WizardHandler, $mdDialog) {
+        $scope.players = [
+          { name: '村民', symbol: 'villager' },
+          { name: '狼人', symbol: 'werewolf' }
+        ];
+        $scope.positions = [
+          { name: '预言家', symbol: 'seer' },
+          { name: '女巫', symbol: 'witch' },
+          { name: '猎人', symbol: 'hunter' },
+          { name: '白痴', symbol: 'idiot' }
+        ];
+        $scope.s = {
+          voiceEnabled: false,
+          villager: {
+            players: [],
+            count: 3
+          },
+          werewolf: {
+            players: [],
+            count: 3
+          },
+          seer: {
+            exists: true,
+            player: -1,
+            result: ''
+          },
+          witch: {
+            exists: true,
+            player: -1,
+            canSave: true,
+            canPoison: true
+          },
+          idiot: {
+            exists: false,
+            player: -1
+          },
+          hunter: {
+            exists: true,
+            player: -1,
+            canShoot: true
+          },
+          dead: {
+            players: []
+          },
+          killing: {
+            player: -1
+          }
+        };
+        $scope.logText = [];
+        $scope.currentStep = "";
+        var voice = window.speechSynthesis;
+        $scope.speak = function(text) {
+          if (!$scope.s.voiceEnabled) return;
+          var msg = new SpeechSynthesisUtterance(text);
+          msg.lang = "zh-CN";
+          voice.speak(msg);
+        }
+        $scope.configured = function() {
+          $scope.s.villager.players = $scope.playerNums();
+        };
+        $scope.totalPlayers = function() {
+          var num = 0;
+          angular.forEach($scope.players, function(player) {
+            num += $scope.s[player.symbol].count;
+          });
+          angular.forEach($scope.positions, function(position) {
+            if ($scope.s[position.symbol].exists) num += 1;
+          });
+          return num;
+        };
+        $scope.playerNums = function() {
+          var num = $scope.totalPlayers();
+          var p = [];
+          for(var i = 1; i <= num; ++i) p.push(i);
+          return p;
+        };
+        $scope.setPosition = function(symbol, number) {
+          $scope.s[symbol].player = number;
+          var idx = $scope.s.villager.players.indexOf(number);
+          if (idx > -1) $scope.s.villager.players.splice(idx, 1);
+        };
+        $scope.exists = function(number, symbol) {
+          return $scope.s[symbol].players.indexOf(number) > -1;
+        };
+        $scope.toggle = function(number, symbol) {
+          var list = $scope.s[symbol].players;
+          var idx = list.indexOf(number);
+          if (idx > -1) list.splice(idx, 1);
+          else list.push(number);
+        };
+        $scope.kill = function(number) {
+          $scope.s.killing.player = number;
+          $scope.log("狼人击杀" + number + "号");
+        };
+        $scope.poison = function(number) {
+          $scope.s.dead.players.push(number);
+          if ($scope.s.hunter.player == number) {
+            $scope.s.hunter.canShoot = false;
+          }
+          $scope.log("女巫毒" + number + "号");
+        };
+        $scope.wakeup = function() {
+          if ($scope.s.killing.player != -1) {
+            $scope.s.dead.players.push($scope.s.killing.player);
+          }
+          for(var i = 0; i < $scope.s.werewolf.count; ++i) {
+            var number = $scope.s.werewolf.players[i];
+            var idx = $scope.s.villager.players.indexOf(number);
+            if (idx > -1) $scope.s.villager.players.splice(idx, 1);
+          }
+        };
+        $scope.seerTest = function(number) {
+          var result;
+          if ($scope.s.werewolf.players.indexOf(number) == -1) {
+            result = number + "号为好人";
+          } else {
+            result = number + "号为狼人";
+          }
+          $mdDialog
+            .show(
+              $mdDialog.alert()
+                .clickOutsideToClose(false)
+                .title(result)
+                .ok('NEXT')
+                
+            )
+            .finally(function() {
+              WizardHandler.wizard().next();
+              result = '';
+            });
+          $scope.log("预言家验" + result);
+        };
+        $scope.witchSave = function() {
+          $scope.log("女巫救" + $scope.s.killing.player + "号");
+          $scope.s.killing.player = -1;
+          $scope.s.witch.canSave = false;
+        };
+        $scope.log = function(text) {
+          $scope.logText.push(text);
+        };
+        $scope.$watch('currentStep', function(newStep, oldStep) {
+          newStep = newStep.substr(0, 4);
+          oldStep = oldStep.substr(0, 4);
+          if (newStep == oldStep) {
+            return;
+          }
+          if (oldStep == "Conf") {
+            $scope.speak("天黑请闭眼");
+          }
+          if (newStep == "Hunt") {
+            $timeout(function() { $scope.speak("猎人请睁眼"); }, 5000);
+          }
+          if (newStep == "Idio") {
+            $timeout(function() { $scope.speak("白痴请睁眼"); }, 5000);
+          }
+          if (newStep == "Wolv") {
+            $timeout(function() { $scope.speak("狼人请睁眼"); }, 5000);
+          }
+          if (newStep == "Witc") {
+            $timeout(function() { $scope.speak("女巫请睁眼"); }, 5000);
+          }
+          if (newStep == "Seer") {
+            $timeout(function() { $scope.speak("预言家请睁眼"); }, 5000);
+          }
+          if (oldStep == "Hunt") {
+            $scope.speak("猎人请闭眼");
+          }
+          if (oldStep == "Idio") {
+            $scope.speak("白痴请闭眼");
+          }
+          if (oldStep == "Wolv") {
+            $scope.speak("狼人请闭眼");
+          }
+          if (oldStep == "Witc") {
+            $scope.speak("女巫请闭眼");
+          }
+          if (oldStep == "Seer") {
+            $scope.speak("预言家请闭眼");
+            $timeout(function() { $scope.speak("天亮了"); }, 5000);
+          }
+        });
+      }]);
+
+    </script>
+
+  </body>
+</html>

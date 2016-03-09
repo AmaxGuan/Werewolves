@@ -23,7 +23,7 @@ $ bundle install
 $ ruby server.rb
 
 ## Test command
-[create a room](http://localhost:4567/create_room?num_players=11&num_wolves=4&prophet=true&witch=true&cupit=true&idiot=true)
+[create a room](http://localhost:4567/create_room?num_players=11&num_wolves=4&seer=true&witch=true&cupit=true&idiot=true)
 
 [see the room info](http://localhost:4567/0/room_info)
 

@@ -3,7 +3,7 @@ require 'yajl'
 require 'pry-byebug'
 
 
-#game logic, a state machine, start with :user_signin, and end with either :villager_win, :wolves_win or :cupit_win
+#game logic, a state machine, start with :user_signin, and end with either :villager_win, :werewolves_win or :cupit_win
 START = :user_signin
 
 # each scene consist of 2 or 3 parts, (who, action, first night or not) concatenated by _
@@ -16,16 +16,16 @@ SCENES = [
   :all_open_1st,
   :all_checkCouple_1st, # if couple, couple can be displayed on user's screen
   :all_close_1st,
-  :wolves_open,
-  :wolves_kill,
-  :wolves_close,
+  :werewolves_open,
+  :werewolves_kill,
+  :werewolves_close,
   :witch_open,
   :witch_rescue,
   :witch_poison,
   :witch_close,
-  :prophet_open,
-  :prophet_check,
-  :prophet_close,
+  :seer_open,
+  :seer_check,
+  :seer_close,
   :all_open,
   :all_compaign_1st,
   :candidates_speak_1st,
@@ -44,12 +44,12 @@ AUTO_COMPLETE_SCENES = [
   :all_open_1st,
   :all_checkCouple_1st,
   :all_close_1st,
-  :wolves_open,
-  :wolves_close,
+  :werewolves_open,
+  :werewolves_close,
   :witch_open,
   :witch_close,
-  :prophet_open,
-  :prophet_close,
+  :seer_open,
+  :seer_close,
   :all_open,
   :all_compaign_1st,
   :reveal_death,
@@ -59,7 +59,7 @@ AUTO_COMPLETE_SCENES = [
 
 FINISHES = [
   :villager_win,
-  :wolves_win,
+  :werewolves_win,
   :cupit_win
 ]
 
@@ -77,15 +77,15 @@ class Room
     @@rooms[Integer(room_id)]
   end
 
-  def initialize(num_players, num_wolves, gods)
+  def initialize(num_players, num_werewolves, gods)
     @id = @@size
     @gods = gods
     @num_players = num_players
-    @num_wolves = num_wolves
+    @num_werewolves = num_werewolves
     @night = 1
     @cur_move = :all_close
     card_shuffler = []
-    num_wolves.times {card_shuffler.push(:wolf)}
+    num_werewolves.times {card_shuffler.push(:werewolf)}
     card_shuffler += gods
     card_shuffler.push(:villager) while card_shuffler.size < num_players
     card_shuffler.shuffle!
@@ -95,7 +95,7 @@ class Room
       users[uid] = User.create(uid, card, @id)
     end
     @votes = {}
-    @wolf_kills = {}
+    @werewolf_kills = {}
     @@rooms[@@size] = self
     @@size += 1
   end
@@ -133,21 +133,21 @@ class Room
     end
   end
 
-  def get_num_living_wolves
+  def get_num_living_werewolves
     sum = 0
     @users.each do |user|
-      sum += 1 if user.card == wolf && user.is_dead == false
+      sum += 1 if user.card == werewolf && user.is_dead == false
     end
     sum
   end
 
-  def wolf_kill(from, to)
+  def werewolf_kill(from, to)
     from_user = get_user(from)
     to_user = get_user(to)
-    raise :wrong_action if from_user.card != :wolf || from_user.is_dead
-    @wolf_kills[@night] = {} if @wolf_kills[@night].nil?
-    @wolf_kills[@night][from] = to
-    if @wolf_kills[@night].length == get_num_living_wolves then
+    raise :wrong_action if from_user.card != :werewolf || from_user.is_dead
+    @werewolf_kills[@night] = {} if @werewolf_kills[@night].nil?
+    @werewolf_kills[@night][from] = to
+    if @werewolf_kills[@night].length == get_num_living_werewolves then
       go_next_move
     end
   end
@@ -194,7 +194,7 @@ class Room
     {
       :id => @id,
       :num_players => @num_players,
-      :num_wolves => @num_wolves,
+      :num_werewolves => @num_werewolves,
       :night => @night,
       :cur_move => @cur_move,
       :cards => @cards,
@@ -211,7 +211,7 @@ class User
     case card
     when :villager
       User.new(id, card, room_id)
-    when :prophet
+    when :seer
       Prophet.new(id, card, room_id)
     end
   end
@@ -272,8 +272,8 @@ end
 
 class Wolf 
   def kill(uid)
-    raise :wrong_action if @room.cur_move != :wolves_kill
-    @room.wolf_kill(@id, uid)
+    raise :wrong_action if @room.cur_move != :werewolves_kill
+    @room.werewolf_kill(@id, uid)
   end
 end
 
@@ -285,8 +285,8 @@ class Prophet < User
   end
 
   def check(uid)
-    raise :wrong_action if @room.cur_move != :prophet_check || !@checked[@room.night].nil?
-    result = @room.get_user(uid).card == :wolf ? 'BAD' : 'GOOD'
+    raise :wrong_action if @room.cur_move != :seer_check || !@checked[@room.night].nil?
+    result = @room.get_user(uid).card == :werewolf ? 'BAD' : 'GOOD'
     @checked[@room.night] = {uid => result}
     @room.go_next_move
     result
@@ -314,12 +314,12 @@ end
 #TODO: change to post, get for easy testing
 get '/create_room' do
   num_players = Integer(params[:num_players])
-  num_wolves = Integer(params[:num_wolves])
+  num_werewolves = Integer(params[:num_werewolves])
   gods = []
-  [:prophet, :witch, :hunter, :idiot, :cupit].each do |char|
+  [:seer, :witch, :hunter, :idiot, :cupit].each do |char|
     gods.push(char) if params[char] == "true"
   end
-  room = Room.new(num_players, num_wolves, gods)
+  room = Room.new(num_players, num_werewolves, gods)
   "Room created, You Room Number is: #{room.id}"
 end
 

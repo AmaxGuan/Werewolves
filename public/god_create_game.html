@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en" >
+  <head>
+    <title>狼人杀上帝</title>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="description" content="">
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no" />
+
+    <link rel='stylesheet' href='https://fonts.googleapis.com/css?family=Roboto:400,500,700,400italic'>
+    <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/angular_material/1.0.4/angular-material.min.css">
+    <style type="text/css">
+        /**
+         * Hide when Angular is not yet loaded and initialized
+         */
+/*        [ng\:cloak], [ng-cloak], [data-ng-cloak], [x-ng-cloak], .ng-cloak, .x-ng-cloak {
+          display: none !important;
+        }*/
+
+        #content  {
+          padding-left: 40px;
+          padding-right: 40px;
+          padding-top: 5px;
+        }
+    </style>
+
+  </head>
+
+  <body ng-app="starterApp" ng-controller="WolfCtrl" layout="row" ng-cloak >
+    <div flex layout="column" tabIndex="-1" role="main" class="md-whiteframe-z2">
+      <wizard hide-indicators="true" current-step="currentStep">
+        <wz-step wz-title="Configure">
+          <md-content flex id="content">
+            <h3>游戏设置</h3>
+            <md-list ng-cloak>
+              <md-list-item>
+                <p>上帝声音</p>
+                <md-checkbox class="md-secondary" ng-model="s.voiceEnabled"></md-checkbox>
+              </md-list-item>
+              <md-list-item ng-repeat="player in players">
+                <p> {{ player.name }} </p>
+                <!-- <div layout class="md-secondary"> -->
+                <input flex="20" type="number" ng-model="s[player.symbol].count" aria-label="{{player.symbol}}-number" aria-controls="{{player.symbol}}-slider">
+                <md-slider flex="20" min="1" max="5" ng-model="s[player.symbol].count" aria-label="{{player.symbol}}-number" id="{{player.symbol}}-slider" md-discrete></md-slider>
+                <!-- </div> -->
+              </md-list-item>
+              <md-list-item ng-repeat="position in positions">
+                <p> {{ position.name }} </p>
+                <md-checkbox class="md-secondary" ng-model="s[position.symbol].exists"></md-checkbox>
+              </md-list-item>
+            </md-list>
+            <div layout="row">
+              <md-button flex="100" layout-align="end center" class="md-raised md-primary" wz-next="createGame()">Next</md-button>
+            </div>
+          </md-content>
+        </wz-step>
+      </wizard>
+    </div>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.9/angular.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.9/angular-animate.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.9/angular-aria.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/angular_material/1.0.4/angular-material.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/angular.wizard/0.6.1/angular-wizard.min.js"></script>
+    <script type="text/javascript">
+    angular
+      .module('starterApp',['ngMaterial', 'mgo-angular-wizard'])
+      .controller('WolfCtrl', ['$scope', '$timeout', 'WizardHandler', '$mdDialog', function($scope, $timeout, WizardHandler, $mdDialog) {
+        var voice = window.speechSynthesis;
+        $scope.speak = function(text) {
+          if (!$scope.s.voiceEnabled) return;
+          var msg = new SpeechSynthesisUtterance(text);
+          msg.lang = "zh-CN";
+          voice.speak(msg);
+        }
+
+        $scope.players = [
+          { name: '村民', symbol: 'villager' },
+          { name: '狼人', symbol: 'werewolf' }
+        ];
+        $scope.positions = [
+          { name: '预言家', symbol: 'seer' },
+          { name: '女巫', symbol: 'witch' },
+          { name: '猎人', symbol: 'hunter' },
+          { name: '白痴', symbol: 'idiot' }
+        ];
+        $scope.s = {
+          voiceEnabled: false,
+          villager: {
+            players: [],
+            count: 3
+          },
+          werewolf: {
+            players: [],
+            count: 3
+          },
+          seer: {
+            exists: true,
+            player: -1,
+            result: ''
+          },
+          witch: {
+            exists: true,
+            player: -1,
+            canSave: true,
+            canPoison: true
+          },
+          idiot: {
+            exists: false,
+            player: -1
+          },
+          hunter: {
+            exists: true,
+            player: -1,
+            canShoot: true
+          },
+          dead: {
+            players: []
+          },
+          killing: {
+            player: -1
+          }
+        };
+
+        $scope.createGame = function() {
+          $scope.s.villager.players = $scope.playerNums();
+        };
+        $scope.totalPlayers = function() {
+          var num = 0;
+          angular.forEach($scope.players, function(player) {
+            num += $scope.s[player.symbol].count;
+          });
+          angular.forEach($scope.positions, function(position) {
+            if ($scope.s[position.symbol].exists) num += 1;
+          });
+          return num;
+        };
+        $scope.playerNums = function() {
+          var num = $scope.totalPlayers();
+          var p = [];
+          for(var i = 1; i <= num; ++i) p.push(i);
+          return p;
+        };
+      }]);
+    </script>
+  </body>
+</html>
