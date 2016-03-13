@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en" >
+  <head>
+    <title>狼人杀上帝</title>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="description" content="">
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no" />
+
+    <link rel='stylesheet' href='https://fonts.googleapis.com/css?family=Roboto:400,500,700,400italic'>
+    <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/angular_material/1.0.4/angular-material.min.css">
+    <style type="text/css">
+        /**
+         * Hide when Angular is not yet loaded and initialized
+         */
+/*        [ng\:cloak], [ng-cloak], [data-ng-cloak], [x-ng-cloak], .ng-cloak, .x-ng-cloak {
+          display: none !important;
+        }*/
+
+        #content  {
+          padding-left: 40px;
+          padding-right: 40px;
+          padding-top: 5px;
+        }
+    </style>
+
+  </head>
+
+  <body ng-app="starterApp" ng-controller="WolfCtrl" layout="row" ng-cloak >
+    <div flex layout="column" tabIndex="-1" role="main" class="md-whiteframe-z2">
+      <wizard hide-indicators="true" current-step="currentStep">
+        <wz-step wz-title="choose_game">
+          <md-content flex id="content">
+            <h3>请输入游戏信息</h3>
+            <md-list ng-cloak>
+              <md-list-item>
+                <p>请输入房间号码</p>
+                <input flex="20" type="number" ng-model="s.room_id" aria-label="room_id" >
+              </md-list-item>
+              <md-list-item>
+                <p>请输入玩家编号</p>
+                <input flex="20" type="number" ng-model="s.user_id" aria-label="user_id" >
+              </md-list-item>
+            </md-list>
+            <div layout="row">
+              <md-button flex="100" layout-align="end center" class="md-raised md-primary" wz-next="joinGame()">Next</md-button>
+            </div>
+          </md-content>
+        </wz-step>
+        <wz-step wz-title="user_signin">
+          <md-content flex>
+          <p>您在本局游戏中的角色是: {{ names[s.user.card] }}</p>
+          </md-content>
+        </wz-step>
+        <wz-step ng-repeat="scene in autoScenes" wz-title="{{scene}}">
+          <md-content flex>
+            <h3>{{scripts[scene]}}</h3>
+            <md-list ng-cloak ng-if="currentStep == 'werewolves_kill' && s.user.card == 'werewolf'">
+              <md-list-item>
+                <p>请输入击杀目标</p>
+                <input flex="20" type="number" aria-label="user_id" ng-model="s.kill_tonight">
+              </md-list-item>
+              <md-list-item>
+                <md-button flex="100" layout-align="end center" class="md-raised md-primary" ng-click="werewolf_kill()">确定击杀</md-button>
+              </md-list-item>
+            </md-list>
+          </md-content>
+        </wz-step>
+      </wizard>
+    </div>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.9/angular.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.9/angular-animate.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.9/angular-aria.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/angular_material/1.0.4/angular-material.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/angular.wizard/0.6.1/angular-wizard.min.js"></script>
+    <script type="text/javascript">
+    angular
+      .module('starterApp',['ngMaterial', 'mgo-angular-wizard'])
+      .controller('WolfCtrl', ['$scope', '$http', 'WizardHandler', '$mdDialog', function($scope, $http, WizardHandler, $mdDialog) {
+        var voice = window.speechSynthesis;
+        $scope.speak = function(text) {
+          if (!$scope.s.voiceEnabled) return;
+          var utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = "zh-CN";
+          voice.speak(utterance);
+        }
+
+        $scope.s = {
+          user: {
+            card: "villager",
+            id: 1
+          }
+        };
+
+        $scope.names = {
+          werewolf: '狼人',
+          villager: '村民',
+          seer: '预言家',
+          witch: '女巫',
+          hunter: '猎人',
+          idiot: '白痴',
+          cupit: '丘比特'
+        };
+
+        $scope.joinGame = function() {
+          $http.get(['', $scope.s.room_id, 'user_signin', $scope.s.user_id].join('/')).then(
+            function onSuccess (response) {
+              var data = response.data
+              console.log(data);
+              if (data.succeed) {
+                $scope.s.user = data.user;
+                $scope.startHeartbeat();
+              } else {
+                $scope.speak("登陆失败，请重试");
+              }
+            }, function onFailure () {
+              $scope.speak("登陆失败，请重试");
+            });
+        };
+
+        var heartbeatTimer = null;
+        $scope.currentStep = "";
+        $scope.startHeartbeat = function() {
+          var room_id = $scope.s.room_id;
+          if (room_id == null) return;
+          if (heartbeatTimer) {
+            // set the interval again
+            window.clearInterval(heartbeatTimer);
+          }
+          heartbeatTimer = window.setInterval(function() {
+            $http.get(['', room_id, 'cur_move'].join('/')).then(
+              function onSuccess (response) {
+                var newStep = response.data.cur_move;
+                if (newStep != $scope.currentStep) {
+                  WizardHandler.wizard().goTo(newStep);
+                }
+              }, function onFailure () {
+
+              });
+            }, 500);
+        }
+
+        var Scripts = $scope.scripts = {
+          'create_game': '',
+          'user_signin': '欢迎来到 来英慢 的舞台，请各位玩家按照上帝屏幕上的房间号码登陆游戏', // 来英慢 发音比较像，哈哈哈
+          'all_close': '所有玩家登陆完毕，游戏现在开始。天黑请闭眼',
+          'werewolves_open': '狼人请睁眼，互相确认身份',
+          'werewolves_kill': '狼人请讨论并决定击杀目标，并由一位狼队有在自己手机上输入击杀目标',
+          'werewolves_close': '狼人请闭眼',
+          'witch_open': '女巫请睁眼',
+          'witch_rescue': '女巫请看自己手机屏幕确定昨日死亡玩家，并确定是否使用解药',
+          'witch_poison': '女巫请选择是否使用毒药',
+          'witch_close': '女巫请闭眼',
+          'seer_open': '预言家请睁眼',
+          'seer_check': '预言家请验人, 您所验证的玩家是否为狼人将在您的手机上显示',
+          'seer_close': '预言家请闭眼',
+          'all_open': '全体玩家请睁眼',
+          'all_compaign_1st': '开始警长竞选,完毕后请在上帝电脑上输入警长身份号码',
+          'reveal_death': '昨天晚上死亡的玩家是',
+          'dead_lastWords_1st': '请死亡玩家发表遗言',
+          'all_speakAndVote': '请大家依次发言，并投票决定放逐，结束后请在上帝电脑上输入放逐目标',
+          'banished_action': '请被放逐玩家留遗言，并决定是否发动技能',
+          'villagers_win': '平民阵营获胜',
+          'werewolves_win': '狼人阵营获胜'
+        };
+
+        $scope.autoScenes = [
+          'all_close',
+          'werewolves_open',
+          'werewolves_kill',
+          'werewolves_close',
+          'witch_open',
+          'witch_rescue',
+          'witch_poison',
+          'witch_close',
+          'seer_open',
+          'seer_check',
+          'seer_close',
+          'all_open',
+          'villagers_win',
+          'werewolves_win'
+        ];
+
+        $scope.werewolf_kill = function() {
+          if ($scope.s.user.card != 'werewolf') return;
+          var to_kill = $scope.s.kill_tonight;
+          $http.post(['', $scope.s.room_id, 'take_action', $scope.s.user_id].join('/'), {
+            action: 'werewolf_kill',
+            target: to_kill
+          });
+        }
+      }]);
+    </script>
+  </body>
+</html>
