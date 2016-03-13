@@ -3,7 +3,7 @@ require 'yajl'
 require 'pry-byebug'
 
 
-#game logic, a state machine, start with :user_signin, and end with either :villager_win, :werewolves_win or :cupit_win
+#game logic, a state machine, start with :user_signin, and end with either :villagers_win, :werewolves_win or :cupit_win
 START = :user_signin
 
 # each scene consist of 2 or 3 parts, (who, action, first night or not) concatenated by _
@@ -13,9 +13,11 @@ SCENES = [
   :cupit_open_1st,
   :cupit_connect_1st,
   :cupit_close_1st,
-  :all_open_1st,
-  :all_checkCouple_1st, # if couple, couple can be displayed on user's screen
-  :all_close_1st,
+  :cupit_allOpen_1st,
+  :cupit_allCheckCouple_1st, # if couple, couple can be displayed on user's screen
+  :cupit_allClose_1st,
+  :cupit_coupleOpen_1st,
+  :cupit_coupleClose_1st,  
   :werewolves_open,
   :werewolves_kill,
   :werewolves_close,
@@ -28,11 +30,8 @@ SCENES = [
   :seer_close,
   :all_open,
   :all_compaign_1st,
-  :candidates_speak_1st,
-  :citizens_vote_1st,
   :reveal_death,
-  :all_speak,
-  :all_vote,
+  :all_speakAndVote,
   :banished_action,
   :dead_lastWords,
 ].freeze
@@ -58,9 +57,17 @@ AUTO_COMPLETE_SCENES = [
 ].freeze
 
 FINISHES = [
-  :villager_win,
+  :villagers_win,
   :werewolves_win,
   :cupit_win
+]
+
+GODS = [
+  :seer,
+  :witch,
+  :hunter,
+  :idiot,
+  :cupit
 ]
 
 class Room
@@ -77,13 +84,20 @@ class Room
     @@rooms[Integer(room_id)]
   end
 
+  def self.clear
+    @@rooms = {}
+    @@size = 0
+  end
+
   def initialize(num_players, num_werewolves, gods)
     @id = @@size
+    @@rooms[@@size] = self
+    @@size += 1
     @gods = gods
     @num_players = num_players
     @num_werewolves = num_werewolves
     @night = 1
-    @cur_move = :all_close
+    @cur_move = :user_signin
     card_shuffler = []
     num_werewolves.times {card_shuffler.push(:werewolf)}
     card_shuffler += gods
@@ -96,8 +110,6 @@ class Room
     end
     @votes = {}
     @werewolf_kills = {}
-    @@rooms[@@size] = self
-    @@size += 1
   end
 
   def get_user(user_id)
@@ -110,14 +122,28 @@ class Room
   end
 
   def get_next_move
-    possible_next = _next_move(@cur_move)
+    return nil if FINISHES.include? cur_move
+    possible_next = _next_move(cur_move)
     if @night != 1 then
       possible_next = _next_move(possible_next) while possible_next.to_s.end_with?('1st')
+    end
+    #skip , use loop do to simulate do while, see http://rosettacode.org/wiki/Loops/Do-while#Ruby
+    loop do
+      before_skip = possible_next    
+      GODS.each do |god|
+        if !@gods.include?(god) then
+          while possible_next.to_s.start_with?(god.to_s)
+            possible_next = _next_move(possible_next)
+          end
+        end
+      end
+      break if before_skip == possible_next
     end
     possible_next
   end
 
   def go_next_move
+    return if FINISHES.include? cur_move
     possible_next = get_next_move
 
     @cur_move = possible_next
@@ -131,25 +157,53 @@ class Room
     if AUTO_COMPLETE_SCENES.include? cur_move then
       go_next_move if Time.new - @cur_move_start_time >= 5 # seconds
     end
+    check_finish
+  end
+
+  ### game logic section ###
+  def user_signin(uid)
+    @login_users = [] if @login_users.nil?
+    @login_users.push(uid)
+    if @login_users.size == @num_players then
+      start_game
+    end
+  end
+
+  def start_game
+    @cur_move = :all_close
+    @cur_move_start_time = Time.new
+    @night = 1
   end
 
   def get_num_living_werewolves
-    sum = 0
-    @users.each do |user|
-      sum += 1 if user.card == werewolf && user.is_dead == false
-    end
-    sum
+    get_num_living_by_category[:werewolf]
   end
+
+  def get_num_living_by_category
+    stats = {}
+    @users.each do |id, user|
+      role = user.card
+      role = :god if GODS.include? user.card
+      stats[role] = 0 if stats[role].nil?
+      stats[role] += 1 if user.is_dead == false
+    end
+    stats
+  end
+
 
   def werewolf_kill(from, to)
     from_user = get_user(from)
     to_user = get_user(to)
-    raise :wrong_action if from_user.card != :werewolf || from_user.is_dead
-    @werewolf_kills[@night] = {} if @werewolf_kills[@night].nil?
-    @werewolf_kills[@night][from] = to
-    if @werewolf_kills[@night].length == get_num_living_werewolves then
-      go_next_move
-    end
+    raise :wrong_action if from_user.card != :werewolf || from_user.is_dead || to_user.is_dead
+    @werewolf_kills[@night] = to
+    to_user.is_dead=true
+    go_next_move
+  end
+
+  def check_finish
+    stats = get_num_living_by_category
+    @cur_move = :werewolves_win if stats[:villager] == 0 || stats[:god] == 0
+    @cur_move = :villagers_win if stats[:werewolf] == 0
   end
 
   #might not be useful, because we could have god enter who's dead directly, but in case
@@ -205,15 +259,38 @@ class Room
 end
 
 class User
-  attr_reader :id, :room, :card, :is_dead, :is_candidate, :is_police, :is_couple
-
+  attr_reader :id, :card, :is_candidate, :is_police, :is_couple, :is_login
+  attr_accessor :is_dead
   def self.create(id, card, room_id)
-    case card
+    klass = case card
     when :villager
-      User.new(id, card, room_id)
+      User
     when :seer
-      Prophet.new(id, card, room_id)
+      Seer
+    when :witch
+      Witch
+    when :werewolf
+      Werewolf
+    when :hunter
+      Hunter
+    else
+      raise :unknown_character
     end
+    klass.new(id, card, room_id)
+  end
+
+  def room
+    @room = Room.get_room(@room_id) if @room.nil?
+    @room
+  end
+
+
+
+  def signin
+    raise :wrong_action if @is_login
+    @is_login = true
+    room.user_signin(@id)
+    true
   end
 
   def can_vote
@@ -252,7 +329,7 @@ class User
     {
       :id => @id,
       :card => @card,
-      :room => @room,
+      :room => room,
       :is_dead => @is_dead,
       :is_candidate => @is_candidate,
       :is_police => @is_police,
@@ -262,22 +339,22 @@ class User
 protected
   def initialize(id, card, room_id)
     @id = id
+    @room_id = room_id
     @card = card
-    @room = Room.get_room(room_id)
     @is_dead = false
     @is_candidate = false
     @is_police = false
   end
 end
 
-class Wolf 
+class Werewolf < User
   def kill(uid)
-    raise :wrong_action if @room.cur_move != :werewolves_kill
-    @room.werewolf_kill(@id, uid)
+    raise :wrong_action if room.cur_move != :werewolves_kill
+    room.werewolf_kill(@id, uid)
   end
 end
 
-class Prophet < User
+class Seer < User
   attr_reader :checked
   def initialize(id, card, room_id)
     super(id, card, room_id)
@@ -285,10 +362,10 @@ class Prophet < User
   end
 
   def check(uid)
-    raise :wrong_action if @room.cur_move != :seer_check || !@checked[@room.night].nil?
-    result = @room.get_user(uid).card == :werewolf ? 'BAD' : 'GOOD'
-    @checked[@room.night] = {uid => result}
-    @room.go_next_move
+    raise :wrong_action if room.cur_move != :seer_check || !@checked[room.night].nil?
+    result = room.get_user(uid).card == :werewolf ? 'BAD' : 'GOOD'
+    @checked[room.night] = {uid => result}
+    room.go_next_move
     result
   end
 end
@@ -311,6 +388,14 @@ end
 
 #### APIS #####
 
+#handle json post request
+before do
+  if request.request_method == "POST" && request.content_type.start_with?('application/json')
+    body_parameters = request.body.read
+    params.merge!(Yajl::Parser.parse(body_parameters))
+  end
+end
+
 def get_or_post(path, opts={}, &block)
   get(path, opts, &block)
   post(path, opts, &block)
@@ -321,7 +406,7 @@ get_or_post '/create_room' do
   num_players = Integer(params[:num_players])
   num_werewolves = Integer(params[:num_werewolves])
   gods = []
-  [:seer, :witch, :hunter, :idiot, :cupit].each do |char|
+  GODS.each do |char|
     gods.push(char) if params[char] == "true"
   end
   room = Room.new(num_players, num_werewolves, gods)
@@ -334,6 +419,16 @@ get '/:room_id/room_info' do
   Yajl::Encoder.encode(room.to_h)
 end
 
+get_or_post '/:room_id/user_signin/:user_id' do
+  room = Room.get_room(params[:room_id])
+  user_id = Integer(params[:user_id])
+  user = room.get_user(params[:user_id])
+  Yajl::Encoder.encode({
+    :succeed => user.signin,
+    :user => user.to_h
+  })
+end
+
 get '/:room_id/user_card/:user_id' do
   room = Room.get_room(params[:room_id])
   user_id = Integer(params[:user_id])
@@ -342,8 +437,8 @@ end
 
 get '/:room_id/cur_move' do
   room = Room.get_room(params[:room_id])
-  cur_move = room.cur_move.to_s
-  cur_move
+  room.heart_beat_check
+  Yajl::Encoder.encode({:cur_move => room.cur_move.to_s});
 end
 
 #TODO: change to post, get for easy testing
@@ -353,10 +448,16 @@ get '/:room_id/god_go_next_move' do
 end
 
 #TODO: change to post, get for easy testing
-get '/:room_id/take_action/:user_id' do
+get_or_post '/:room_id/take_action/:user_id' do
   room = Room.get_room(params[:room_id])
   user = room.get_user(params[:user_id])
-
+  action = params[:action]
+  target = params[:target]
+  case action
+  when 'werewolf_kill'
+    throw :wrong_action if target.nil?
+    user.kill(Integer(target))
+  end
 end
 
 #TODO: change to post, get for easy testing

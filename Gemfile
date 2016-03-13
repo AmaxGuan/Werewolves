@@ -1,5 +1,6 @@
 ruby '2.1.5'
 gem 'sinatra'
 gem 'pry'
-gem 'pry-byebug'
 gem 'yajl-ruby'
+gem 'rack-test'
+gem 'pry-byebug' #debugger
