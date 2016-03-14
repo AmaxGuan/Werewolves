@@ -31,7 +31,7 @@ SCENES = [
   :all_open,
   :all_compaign_1st,
   :reveal_death,
-  :all_speakAndVote,
+  :all_speakAndBanish,
   :banished_action,
   :dead_lastWords,
 ].freeze
@@ -50,7 +50,6 @@ AUTO_COMPLETE_SCENES = [
   :seer_open,
   :seer_close,
   :all_open,
-  :all_compaign_1st,
   :reveal_death,
   :dead_lastWords,
   :banished_action,
@@ -110,6 +109,8 @@ class Room
     end
     @votes = {}
     @werewolf_kills = {}
+    @banishes = {}
+    @witch_poison = {}
   end
 
   def get_user(user_id)
@@ -190,6 +191,15 @@ class Room
     stats
   end
 
+  def get_death_night
+    [@werewolf_kills[@night], @witch_poison[@night]].compact
+  end
+
+  def check_finish
+    stats = get_num_living_by_category
+    @cur_move = :werewolves_win if stats[:villager] == 0 || stats[:god] == 0
+    @cur_move = :villagers_win if stats[:werewolf] == 0
+  end
 
   def werewolf_kill(from, to)
     from_user = get_user(from)
@@ -200,10 +210,18 @@ class Room
     go_next_move
   end
 
-  def check_finish
-    stats = get_num_living_by_category
-    @cur_move = :werewolves_win if stats[:villager] == 0 || stats[:god] == 0
-    @cur_move = :villagers_win if stats[:werewolf] == 0
+  def select_police(uid)
+    user = get_user(uid)
+    @police = user.id
+    user.is_police = true
+    go_next_move
+  end
+
+  def select_banish(uid)
+    user = get_user(uid)
+    @banishes[@night] = user.id
+    user.is_dead = true
+    go_next_move
   end
 
   #might not be useful, because we could have god enter who's dead directly, but in case
@@ -253,14 +271,14 @@ class Room
       :cur_move => @cur_move,
       :cards => @cards,
       :votes => @votes,
-      :users => @users.map(&:to_h)
+      :users => @users.map{|key, value| }
     }
   end
 end
 
 class User
-  attr_reader :id, :card, :is_candidate, :is_police, :is_couple, :is_login
-  attr_accessor :is_dead
+  attr_reader :id, :card, :is_candidate, :is_couple, :is_login
+  attr_accessor :is_dead, :is_police
   def self.create(id, card, room_id)
     klass = case card
     when :villager
@@ -350,7 +368,7 @@ end
 class Werewolf < User
   def kill(uid)
     raise :wrong_action if room.cur_move != :werewolves_kill
-    room.werewolf_kill(@id, uid)
+    room.werewolf_kill(@id, Integer(uid))
   end
 end
 
@@ -438,7 +456,11 @@ end
 get '/:room_id/cur_move' do
   room = Room.get_room(params[:room_id])
   room.heart_beat_check
-  Yajl::Encoder.encode({:cur_move => room.cur_move.to_s});
+  ret = {:cur_move => room.cur_move.to_s}
+  if room.cur_move == :reveal_death
+    ret[:death] = room.get_death_night
+  end
+  Yajl::Encoder.encode(ret);
 end
 
 #TODO: change to post, get for easy testing
@@ -455,13 +477,30 @@ get_or_post '/:room_id/take_action/:user_id' do
   target = params[:target]
   case action
   when 'werewolf_kill'
-    throw :wrong_action if target.nil?
-    user.kill(Integer(target))
+    if user.card == :werewolf && !user.is_dead && (target.nil? || target == '')
+      room.go_next_move  #no kill
+    else
+      user.kill(target)
+    end
   end
 end
 
 #TODO: change to post, get for easy testing
 # god can designate who's police, who's bunished
-get '/:room_id/god_take_action' do
+get_or_post '/:room_id/god_take_action' do
   room = Room.get_room(params[:room_id])
+  action = params[:action]
+  target = params[:target]
+  if target.nil? || target == ''
+    room.go_next_move
+  else
+    case action
+    when 'select_police'
+      raise :wrong_action if room.cur_move != :all_compaign_1st
+      room.select_police(target)
+    when 'select_banish'
+      raise :wrong_action if room.cur_move != :all_speakAndBanish
+      room.select_banish(target)
+    end
+  end
 end 

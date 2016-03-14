@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en" >
   <head>
-    <title>狼人杀上帝</title>
+    <title>狼人杀玩家</title>
 
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -56,13 +56,13 @@
         <wz-step ng-repeat="scene in autoScenes" wz-title="{{scene}}">
           <md-content flex>
             <h3>{{scripts[scene]}}</h3>
-            <md-list ng-cloak ng-if="currentStep == 'werewolves_kill' && s.user.card == 'werewolf'">
+            <md-list ng-cloak ng-if="scene == 'werewolves_kill' && s.user.card == 'werewolf'">
               <md-list-item>
                 <p>请输入击杀目标</p>
                 <input flex="20" type="number" aria-label="user_id" ng-model="s.kill_tonight">
               </md-list-item>
               <md-list-item>
-                <md-button flex="100" layout-align="end center" class="md-raised md-primary" ng-click="werewolf_kill()">确定击杀</md-button>
+                <md-button flex="100" layout-align="end center" class="md-raised md-primary" ng-click="werewolf_kill()">确定或放弃击杀</md-button>
               </md-list-item>
             </md-list>
           </md-content>
@@ -159,7 +159,7 @@
           'all_compaign_1st': '开始警长竞选,完毕后请在上帝电脑上输入警长身份号码',
           'reveal_death': '昨天晚上死亡的玩家是',
           'dead_lastWords_1st': '请死亡玩家发表遗言',
-          'all_speakAndVote': '请大家依次发言，并投票决定放逐，结束后请在上帝电脑上输入放逐目标',
+          'all_speakAndBanish': '请大家依次发言，并投票决定放逐，结束后请在上帝电脑上输入放逐目标',
           'banished_action': '请被放逐玩家留遗言，并决定是否发动技能',
           'villagers_win': '平民阵营获胜',
           'werewolves_win': '狼人阵营获胜'
@@ -178,6 +178,9 @@
           'seer_check',
           'seer_close',
           'all_open',
+          'all_compaign_1st',
+          'reveal_death',
+          'all_speakAndBanish',
           'villagers_win',
           'werewolves_win'
         ];
