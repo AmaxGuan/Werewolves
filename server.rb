@@ -27,6 +27,7 @@ SCENES = [
   :witch_close,
   :seer_open,
   :seer_check,
+  :seer_checkResult,
   :seer_close,
   :all_open,
   :all_compaign_1st,
@@ -48,6 +49,7 @@ AUTO_COMPLETE_SCENES = [
   :witch_open,
   :witch_close,
   :seer_open,
+  :seer_checkResult,
   :seer_close,
   :all_open,
   :reveal_death,
@@ -111,6 +113,7 @@ class Room
     @werewolf_kills = {}
     @banishes = {}
     @witch_poison = {}
+    @seer_checks = {}
   end
 
   def get_user(user_id)
@@ -210,6 +213,20 @@ class Room
     go_next_move
   end
 
+  def seer_check(from, to)
+    from_user = get_user(from)
+    to_user = get_user(to)
+    if from_user.card != :seer ||
+        (from_user.is_dead && @werewolf_kills[@night] != @from_user.id) ||
+        cur_move != :seer_check ||
+        !@seer_checks[@night].nil? then
+      raise :wrong_action
+    end
+    @seer_checks[@night] = to_user.id
+    go_next_move
+    to_user.card == :werewolf ? 'BAD' : 'GOOD'
+  end
+
   def select_police(uid)
     user = get_user(uid)
     @police = user.id
@@ -305,9 +322,10 @@ class User
 
 
   def signin
-    raise :wrong_action if @is_login
-    @is_login = true
-    room.user_signin(@id)
+    unless @is_login
+      room.user_signin(@id)
+      @is_login = true
+    end
     true
   end
 
@@ -373,18 +391,9 @@ class Werewolf < User
 end
 
 class Seer < User
-  attr_reader :checked
-  def initialize(id, card, room_id)
-    super(id, card, room_id)
-    @checked = {}
-  end
-
   def check(uid)
-    raise :wrong_action if room.cur_move != :seer_check || !@checked[room.night].nil?
-    result = room.get_user(uid).card == :werewolf ? 'BAD' : 'GOOD'
-    @checked[room.night] = {uid => result}
-    room.go_next_move
-    result
+    raise :wrong_action if room.cur_move != :seer_check
+    room.seer_check(id, uid)
   end
 end
 
@@ -425,7 +434,7 @@ get_or_post '/create_room' do
   num_werewolves = Integer(params[:num_werewolves])
   gods = []
   GODS.each do |char|
-    gods.push(char) if params[char] == "true"
+    gods.push(char) if params[char] == true || params[char] == 'true'
   end
   room = Room.new(num_players, num_werewolves, gods)
   Yajl::Encoder.encode({:room_id => room.id })
@@ -457,7 +466,8 @@ get '/:room_id/cur_move' do
   room = Room.get_room(params[:room_id])
   room.heart_beat_check
   ret = {:cur_move => room.cur_move.to_s}
-  if room.cur_move == :reveal_death
+  case room.cur_move
+  when :reveal_death
     ret[:death] = room.get_death_night
   end
   Yajl::Encoder.encode(ret);
@@ -482,6 +492,8 @@ get_or_post '/:room_id/take_action/:user_id' do
     else
       user.kill(target)
     end
+  when 'seer_check'
+    Yajl::Encoder.encode({:result => user.check(target)})
   end
 end
 

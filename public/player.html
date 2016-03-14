@@ -58,12 +58,23 @@
             <h3>{{scripts[scene]}}</h3>
             <md-list ng-cloak ng-if="scene == 'werewolves_kill' && s.user.card == 'werewolf'">
               <md-list-item>
-                <p>请输入击杀目标</p>
+                <p>请输入击杀目标，空白为放弃击杀</p>
                 <input flex="20" type="number" aria-label="user_id" ng-model="s.kill_tonight">
               </md-list-item>
               <md-list-item>
                 <md-button flex="100" layout-align="end center" class="md-raised md-primary" ng-click="werewolf_kill()">确定或放弃击杀</md-button>
               </md-list-item>
+            </md-list>
+            <md-list ng-cloak ng-if="scene == 'seer_check' && s.user.card == 'seer'">
+              <md-list-item>
+                <input flex="20" type="number" aria-label="user_id" ng-model="s.check_tonight">
+              </md-list-item>
+              <md-list-item>
+                <md-button flex="100" layout-align="end center" class="md-raised md-primary" ng-click="seer_check()">确定</md-button>
+              </md-list-item>
+            </md-list>
+            <md-list ng-cloak ng-if="scene == 'seer_checkResult' && s.user.card == 'seer'">
+              <p>{{s.check_result}}</p>
             </md-list>
           </md-content>
         </wz-step>
@@ -133,6 +144,8 @@
               function onSuccess (response) {
                 var newStep = response.data.cur_move;
                 if (newStep != $scope.currentStep) {
+                  console.log("change to " + newStep);
+                  console.log(response.data);
                   WizardHandler.wizard().goTo(newStep);
                 }
               }, function onFailure () {
@@ -154,6 +167,7 @@
           'witch_close': '女巫请闭眼',
           'seer_open': '预言家请睁眼',
           'seer_check': '预言家请验人, 您所验证的玩家是否为狼人将在您的手机上显示',
+          'seer_checkResult': '您所验证的玩家是',
           'seer_close': '预言家请闭眼',
           'all_open': '全体玩家请睁眼',
           'all_compaign_1st': '开始警长竞选,完毕后请在上帝电脑上输入警长身份号码',
@@ -176,6 +190,7 @@
           'witch_close',
           'seer_open',
           'seer_check',
+          'seer_checkResult',
           'seer_close',
           'all_open',
           'all_compaign_1st',
@@ -192,7 +207,20 @@
             action: 'werewolf_kill',
             target: to_kill
           });
-        }
+        };
+
+        $scope.seer_check = function() {
+          if ($scope.s.user.card != 'seer') return;
+          var to_check = $scope.s.check_tonight;
+          $http.post(['', $scope.s.room_id, 'take_action', $scope.s.user_id].join('/'), {
+            action: 'seer_check',
+            target: to_check
+          }).then(function(response) {
+            var data = response.data;
+            console.log('seer_check response:' + data);
+            $scope.s.check_result = response.data.result == 'GOOD' ? '好人' : '狼人';
+          });
+        };
       }]);
     </script>
   </body>
