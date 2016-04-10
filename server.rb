@@ -113,6 +113,7 @@ class Room
     @werewolf_kills = {}
     @banishes = {}
     @witch_poison = {}
+    @witch_rescue = {}
     @seer_checks = {}
   end
 
@@ -194,8 +195,13 @@ class Room
     stats
   end
 
+  def get_wolveskill_tonight
+    @werewolf_kills[@night]
+  end
+
   def get_death_night
-    [@werewolf_kills[@night], @witch_poison[@night]].compact
+    kill = get_wolveskill_tonight == @witch_rescue[@night] ? nil : get_wolveskill_tonight
+    [kill, @witch_poison[@night]].compact
   end
 
   def check_finish
@@ -217,7 +223,7 @@ class Room
     from_user = get_user(from)
     to_user = get_user(to)
     if from_user.card != :seer ||
-        (from_user.is_dead && @werewolf_kills[@night] != @from_user.id) ||
+        (from_user.is_dead && !get_death_night.include?(@from_user.id)) ||
         cur_move != :seer_check ||
         !@seer_checks[@night].nil? then
       raise :wrong_action
@@ -225,6 +231,28 @@ class Room
     @seer_checks[@night] = to_user.id
     go_next_move
     to_user.card == :werewolf ? 'BAD' : 'GOOD'
+  end
+
+  def witch_can_rescue?
+    @witch_rescue.empty?
+  end
+
+  def witch_rescue(from)
+    from_user = get_user(from)
+    to_user = get_user(get_wolveskill_tonight)
+    raise :wrong_action if from_user.card != :witch || !witch_can_rescue? || get_wolveskill_tonight == from
+    @witch_rescue[@night] = get_wolveskill_tonight
+    to_user.is_dead = false
+    go_next_move
+  end
+
+  def witch_poison(from, to)
+    from_user = get_user(from)
+    to_user = get_user(to)
+    raise :wrong_action if from_user.card != :witch || !@witch_poison.empty?
+    @witch_poison[@night] = to
+    to_user.is_dead = true
+    go_next_move
   end
 
   def select_police(uid)
@@ -288,7 +316,11 @@ class Room
       :cur_move => @cur_move,
       :cards => @cards,
       :votes => @votes,
-      :users => @users.map{|key, value| }
+      :users => @users.map{|k, v| [k, v.to_h]}.to_h,
+      :werewolf_kills => @werewolf_kills,
+      :witch_rescue => @witch_rescue,
+      :witch_poison => @witch_poison,
+      :banishes => @banishes
     }
   end
 end
@@ -319,8 +351,6 @@ class User
     @room
   end
 
-
-
   def signin
     unless @is_login
       room.user_signin(@id)
@@ -333,6 +363,10 @@ class User
     !is_dead && !is_spirit
   end
 
+  def can_take_action?
+    !is_dead || room.get_death_night.include? id
+  end
+
   def vote(to_id)
     room.vote(id, to_id)
   end
@@ -341,13 +375,21 @@ class User
     raise :wrong_action
   end
 
+  def rescue
+    raise :wrong_action
+  end
+
+  def no_rescue
+    raise :wrong_action
+  end
+
   def poison(uid)
     raise :wrong_action
   end
 
-  def rescue(uid)
+  def no_poison
     raise :wrong_action
-  end
+  end    
 
   def check(uid)
     raise :wrong_action
@@ -398,7 +440,25 @@ class Seer < User
 end
 
 class Witch < User
+  def rescue
+    raise :wrong_action if room.cur_move != :witch_rescue
+    room.witch_rescue(id)
+  end
 
+  def no_rescue
+    raise :wrong_action if room.cur_move != :witch_rescue
+    room.go_next_move
+  end
+
+  def poison(uid)
+    raise :wrong_action if room.cur_move != :witch_poison
+    room.witch_poison(id, uid)
+  end
+
+  def no_poison
+    raise :wrong_action if room.cur_move != :witch_poison
+    room.go_next_move
+  end
 end
 
 class Cupit < User
@@ -469,6 +529,8 @@ get '/:room_id/cur_move' do
   case room.cur_move
   when :reveal_death
     ret[:death] = room.get_death_night
+  when :witch_rescue
+    ret[:killed] = room.witch_can_rescue? ? room.get_wolveskill_tonight : -1
   end
   Yajl::Encoder.encode(ret);
 end
@@ -485,6 +547,7 @@ get_or_post '/:room_id/take_action/:user_id' do
   user = room.get_user(params[:user_id])
   action = params[:action]
   target = params[:target]
+  raise wrong_action if !user.can_take_action?
   case action
   when 'werewolf_kill'
     if user.card == :werewolf && !user.is_dead && (target.nil? || target == '')
@@ -494,6 +557,14 @@ get_or_post '/:room_id/take_action/:user_id' do
     end
   when 'seer_check'
     Yajl::Encoder.encode({:result => user.check(target)})
+  when 'witch_rescue'
+    user.rescue
+  when 'witch_no_rescue'
+    user.no_rescue
+  when 'witch_poison'
+    user.poison(target)
+  when 'witch_no_poison'
+    user.no_poison
   end
 end
 

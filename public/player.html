@@ -65,6 +65,32 @@
                 <md-button flex="100" layout-align="end center" class="md-raised md-primary" ng-click="werewolf_kill()">确定或放弃击杀</md-button>
               </md-list-item>
             </md-list>
+            <md-list ng-cloak ng-if="scene == 'witch_rescue' && s.user.card == 'witch'">
+              <md-list-item ng-if="s.killed_tonight !== -1">
+                <p>昨夜死亡的玩家是{{s.killed_tonight}}号玩家，是否使用解药</p>
+              </md-list-item>
+              <md-list-item ng-if="s.killed_tonight === -1">
+                <p>已使用过解药，无法查看死亡玩家，点击不使用进入下一步</p>
+              </md-list-item>
+              <md-list-item ng-if="s.killed_tonight == null">
+                <p>昨夜平安夜，点击不使用进入下一步</p>
+              </md-list-item>
+              <md-list-item>
+                <md-button flex="100" layout-align="end center" class="md-raised md-primary" ng-click="witch_rescue()">使用</md-button>
+                <md-button flex="100" layout-align="end center" class="md-raised" ng-click="witch_no_rescue()">不使用</md-button>
+              </md-list-item>
+            </md-list>
+            <md-list ng-cloak ng-if="scene == 'witch_poison' && s.user.card == 'witch'">
+              <md-list-item>
+                <p>输入毒杀玩家号码</p>
+                <input flex="20" type="number" aria-label="user_id" ng-model="s.poison_tonight">
+              </md-list-item>
+              <md-list-item>
+                <md-button flex="100" layout-align="end center" class="md-raised md-primary" ng-click="witch_poison()">使用</md-button>
+                <md-button flex="100" layout-align="end center" class="md-raised" ng-click="witch_no_poison()">不使用</md-button>
+              </md-list-item>
+            </md-list>
+
             <md-list ng-cloak ng-if="scene == 'seer_check' && s.user.card == 'seer'">
               <md-list-item>
                 <input flex="20" type="number" aria-label="user_id" ng-model="s.check_tonight">
@@ -144,6 +170,9 @@
               function onSuccess (response) {
                 var newStep = response.data.cur_move;
                 if (newStep != $scope.currentStep) {
+                  if (newStep == 'witch_rescue' && $scope.s.user.card == 'witch') {
+                    $scope.s.killed_tonight = response.data.killed;
+                  }
                   console.log("change to " + newStep);
                   console.log(response.data);
                   WizardHandler.wizard().goTo(newStep);
@@ -221,6 +250,36 @@
             $scope.s.check_result = response.data.result == 'GOOD' ? '好人' : '狼人';
           });
         };
+
+        $scope.witch_rescue = function() {
+          if ($scope.s.user.card != 'witch') return;
+          $http.post(['', $scope.s.room_id, 'take_action', $scope.s.user_id].join('/'), {
+            action: 'witch_rescue',
+          });
+        };
+        $scope.witch_no_rescue = function() {
+          if ($scope.s.user.card != 'witch') return;
+          $http.post(['', $scope.s.room_id, 'take_action', $scope.s.user_id].join('/'), {
+            action: 'witch_no_rescue',
+          });
+        };
+
+        $scope.witch_poison = function() {
+          if ($scope.s.user.card != 'witch') return;
+          var to_poison = $scope.s.poison_tonight;
+          $http.post(['', $scope.s.room_id, 'take_action', $scope.s.user_id].join('/'), {
+            action: 'witch_poison',
+            target: to_poison
+          });
+        };
+        $scope.witch_no_poison = function() {
+          if ($scope.s.user.card != 'witch') return;
+          $http.post(['', $scope.s.room_id, 'take_action', $scope.s.user_id].join('/'), {
+            action: 'witch_no_poison',
+          });
+        };
+
+
       }]);
     </script>
   </body>
