@@ -2,6 +2,9 @@ require 'sinatra'
 require 'yajl'
 require 'pry-byebug'
 
+set :bind, '0.0.0.0'
+set :port, 8080
+
 
 #game logic, a state machine, start with :user_signin, and end with either :villagers_win, :werewolves_win or :cupit_win
 START = :user_signin
@@ -160,7 +163,7 @@ class Room
   # routine check, invoked in every heart beat function
   def heart_beat_check
     if AUTO_COMPLETE_SCENES.include? cur_move then
-      go_next_move if Time.new - @cur_move_start_time >= 5 # seconds
+      go_next_move if Time.new - @cur_move_start_time >= 5 || ENV["RACK_ENV"] == "test"
     end
     check_finish
   end
@@ -364,7 +367,7 @@ class User
   end
 
   def can_take_action?
-    !is_dead || room.get_death_night.include? id
+    !is_dead || room.get_death_night.include?(id)
   end
 
   def vote(to_id)
@@ -524,7 +527,6 @@ end
 
 get '/:room_id/cur_move' do
   room = Room.get_room(params[:room_id])
-  room.heart_beat_check
   ret = {:cur_move => room.cur_move.to_s}
   case room.cur_move
   when :reveal_death
@@ -532,6 +534,8 @@ get '/:room_id/cur_move' do
   when :witch_rescue
     ret[:killed] = room.witch_can_rescue? ? room.get_wolveskill_tonight : -1
   end
+  # put here to keep tests working
+  room.heart_beat_check
   Yajl::Encoder.encode(ret);
 end
 
