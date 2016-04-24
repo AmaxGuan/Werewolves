@@ -3,7 +3,7 @@ require 'yajl'
 require 'pry-byebug'
 
 set :bind, '0.0.0.0'
-set :port, 8080
+set :port, 80
 
 
 #game logic, a state machine, start with :user_signin, and end with either :villagers_win, :werewolves_win or :cupit_win
@@ -152,19 +152,29 @@ class Room
 
   def go_next_move
     return if FINISHES.include? cur_move
+    if @cur_move == :user_signin
+      @cur_move = :all_close
+      return
+    end
     possible_next = get_next_move
-
     @cur_move = possible_next
-    @cur_move_start_time = Time.new
+    if AUTO_COMPLETE_SCENES.include? @cur_move then
+      go_next_move_with_delay(5)
+    else
+      @time_go_next_move = nil
+    end
     @night += 1 if @cur_move == :all_close
     @cur_move
   end
 
+  def go_next_move_with_delay(time_in_sec)
+      delay = ENV["RACK_ENV"] == "test" ? 0 : time_in_sec
+      @time_go_next_move = Time.new + delay
+  end
+
   # routine check, invoked in every heart beat function
   def heart_beat_check
-    if AUTO_COMPLETE_SCENES.include? cur_move then
-      go_next_move if Time.new - @cur_move_start_time >= 5 || ENV["RACK_ENV"] == "test"
-    end
+    go_next_move if !@time_go_next_move.nil? && Time.new  >= @time_go_next_move
     check_finish
   end
 
@@ -178,8 +188,7 @@ class Room
   end
 
   def start_game
-    @cur_move = :all_close
-    @cur_move_start_time = Time.new
+    go_next_move_with_delay(5)
     @night = 1
   end
 
