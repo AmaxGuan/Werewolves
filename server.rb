@@ -3,7 +3,7 @@ require 'yajl'
 require 'pry-byebug'
 
 set :bind, '0.0.0.0'
-set :port, 80
+set :port, 8080
 
 
 #game logic, a state machine, start with :user_signin, and end with either :villagers_win, :werewolves_win or :cupit_win
