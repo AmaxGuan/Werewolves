@@ -38,6 +38,7 @@ class ServerTest < Test::Unit::TestCase
     assert last_response.ok?
     json_body = Yajl::Parser.parse(last_response.body)
     assert_equal true, json_body['succeed']
+    check_next_move('user_signin')
     check_next_move('all_close')
   end
 
@@ -61,6 +62,7 @@ class ServerTest < Test::Unit::TestCase
     wolf = json_body["users"]["1"]["card"] == "werewolf" ? 1 : 2
     villager = wolf == 1 ? 2 : 1
 
+    check_next_move('user_signin')
     check_next_move('all_close')
     check_next_move('werewolves_open')
     check_next_move('werewolves_kill')

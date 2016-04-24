@@ -100,7 +100,7 @@ class Room
     @gods = gods
     @num_players = num_players
     @num_werewolves = num_werewolves
-    @night = 1
+    @night = 0
     @cur_move = :user_signin
     card_shuffler = []
     num_werewolves.times {card_shuffler.push(:werewolf)}
@@ -125,8 +125,12 @@ class Room
   end
 
   def _next_move(cur_move)
-    next_index = (SCENES.index(cur_move) + 1) % SCENES.size
-    SCENES[next_index]
+    if cur_move == :user_signin
+      :all_close
+    else
+      next_index = (SCENES.index(cur_move) + 1) % SCENES.size
+      SCENES[next_index]
+    end
   end
 
   def get_next_move
@@ -152,10 +156,6 @@ class Room
 
   def go_next_move
     return if FINISHES.include? cur_move
-    if @cur_move == :user_signin
-      @cur_move = :all_close
-      return
-    end
     possible_next = get_next_move
     @cur_move = possible_next
     if AUTO_COMPLETE_SCENES.include? @cur_move then
@@ -174,7 +174,7 @@ class Room
 
   # routine check, invoked in every heart beat function
   def heart_beat_check
-    go_next_move if !@time_go_next_move.nil? && Time.new  >= @time_go_next_move
+    go_next_move if !@time_go_next_move.nil? && Time.new >= @time_go_next_move
     check_finish
   end
 
@@ -189,7 +189,6 @@ class Room
 
   def start_game
     go_next_move_with_delay(5)
-    @night = 1
   end
 
   def get_num_living_werewolves
