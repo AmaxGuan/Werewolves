@@ -28,7 +28,7 @@
   </head>
 
   <body ng-app="starterApp" ng-controller="WolfCtrl" layout="row" ng-cloak >
-    <div flex layout="column" tabIndex="-1" role="main" class="md-whiteframe-z2">
+    <div flex layout="column" tabIndex="-1" role="main" class="md-whiteframe-z2" id="popupContainer">
       <wizard hide-indicators="true" current-step="currentStep">
         <wz-step wz-title="create_game">
           <md-content flex id="content">
@@ -74,11 +74,11 @@
             </md-list>
             <md-list ng-cloak ng-if="scene == 'all_speakAndBanish'">
               <md-list-item>
-                <p>请输入放逐目标</p>
+                <p>请输入放逐目标(点击确认后将弹出玩家身份，死者将自动成为上帝，请上帝单独观看结果)</p>
                 <input flex="20" type="number" aria-label="user_id" ng-model="s.banish">
               </md-list-item>
               <md-list-item>
-                <md-button flex="100" layout-align="end center" class="md-raised md-primary" ng-click="selectBanish()">确定</md-button>
+                <md-button flex="100" layout-align="end center" class="md-raised md-primary" ng-click="selectBanish($event)">确定</md-button>
               </md-list-item>
             </md-list>
           </md-content>
@@ -88,11 +88,12 @@
     <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.9/angular.min.js"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.9/angular-animate.min.js"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.9/angular-aria.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.9/angular-sanitize.js"></script>
     <script src="https://ajax.googleapis.com/ajax/libs/angular_material/1.0.4/angular-material.min.js"></script>
     <script src="https://cdn.jsdelivr.net/angular.wizard/0.6.1/angular-wizard.min.js"></script>
     <script type="text/javascript">
     angular
-      .module('starterApp',['ngMaterial', 'mgo-angular-wizard'])
+      .module('starterApp',['ngMaterial', 'mgo-angular-wizard', 'ngSanitize'])
       .controller('WolfCtrl', ['$scope', '$http', 'WizardHandler', '$mdDialog', function($scope, $http, WizardHandler, $mdDialog) {
         var voice = window.speechSynthesis;
         $scope.speak = function(text) {
@@ -320,12 +321,33 @@ SCENES = [
           });
         };
 
-        $scope.selectBanish = function() {
-          $http.post(['', $scope.s.room_id, 'god_take_action'].join('/'), {
-            action: 'select_banish',
-            target: $scope.s.banish
-          });
+        $scope.selectBanish = function(ev) {
+          $http.get(['', $scope.s.room_id, 'room_info'].join('/'))
+            .then(function(response) {
+              $mdDialog.show(
+                $mdDialog.alert()
+                  .parent(angular.element(document.querySelector('#popupContainer')))
+                  .clickOutsideToClose(true)
+                  .title('玩家身份')
+                  .htmlContent(
+                    JSON.stringify(response.data, null, "  ")
+                      .replace(/\n/g, "<br>")
+                      .replace(/ /g, "&nbsp;")
+                  )
+                  .ariaLabel('玩家身份')
+                  .ok('Got it!')
+                  .targetEvent(ev)
+              );
+            });
+
+          // $http.post(['', $scope.s.room_id, 'god_take_action'].join('/'), {
+          //   action: 'select_banish',
+          //   target: $scope.s.banish
+          // });
         }
+        
+        // develop script
+        // setTimeout(function() {WizardHandler.wizard().goTo("all_speakAndBanish");}, 1000);
       }]);
     </script>
   </body>

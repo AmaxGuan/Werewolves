@@ -38,6 +38,3 @@ DEPENDENCIES
   rack-test
   sinatra
   yajl-ruby
-
-BUNDLED WITH
-   1.11.2

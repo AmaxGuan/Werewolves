@@ -264,7 +264,6 @@
         $scope.currentStep = "";
         var voice = window.speechSynthesis;
         $scope.speak = function(text) {
-          if (!$scope.s.voiceEnabled) return;
           var msg = new SpeechSynthesisUtterance(text);
           msg.lang = "zh-CN";
           voice.speak(msg);
