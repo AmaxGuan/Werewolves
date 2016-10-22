@@ -234,7 +234,7 @@ class Room
     from_user = get_user(from)
     to_user = get_user(to)
     if from_user.card != :seer ||
-        (from_user.is_dead && !get_death_night.include?(@from_user.id)) ||
+        (from_user.is_dead && !get_death_night.include?(from_user.id)) ||
         cur_move != :seer_check ||
         !@seer_checks[@night].nil? then
       raise :wrong_action
@@ -251,7 +251,7 @@ class Room
   def witch_rescue(from)
     from_user = get_user(from)
     to_user = get_user(get_wolveskill_tonight)
-    raise :wrong_action if from_user.card != :witch || !witch_can_rescue? || get_wolveskill_tonight == from
+    raise :wrong_action if from_user.card != :witch || !witch_can_rescue? # || get_wolveskill_tonight == from
     @witch_rescue[@night] = get_wolveskill_tonight
     to_user.is_dead = false
     go_next_move
@@ -351,6 +351,8 @@ class User
       Werewolf
     when :hunter
       Hunter
+    when :idiot
+      Idiot
     else
       raise :unknown_character
     end
@@ -535,6 +537,7 @@ end
 
 get '/:room_id/cur_move' do
   room = Room.get_room(params[:room_id])
+  halt 404, 'room not found' if room.nil?
   ret = {:cur_move => room.cur_move.to_s}
   case room.cur_move
   when :reveal_death
@@ -598,4 +601,5 @@ get_or_post '/:room_id/god_take_action' do
       room.select_banish(target)
     end
   end
-end 
+end
+
