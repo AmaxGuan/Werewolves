@@ -4,7 +4,7 @@ The common problem we face when playing Werewolves game is that, often it's hard
 
 This is a simple web server that can run on a laptop with ruby, and connect from your cell phones to play Werewolves game, so that all the players can enjoy the game itself
 
-This server is still under development
+This server is still under development, currently only support logic for the first night
 
 # How to Run
 
